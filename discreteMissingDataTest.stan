@@ -184,10 +184,10 @@ transformed data{
 parameters{
   vector[k] beta; // Assume no hierarchy
   real<lower=0> sigma;
-#  cholesky_factor_corr[k-1] L;
+  cholesky_factor_corr[k-1] L;
   row_vector[nMissing] xProbsLogit;
-#  vector<upper=-2>[nZero] xZero;
-#  vector<lower=2>[nOne] xOne;
+  vector<upper=-2>[nZero] xZero;
+  vector<lower=2>[nOne] xOne;
 }
 transformed parameters{
   row_vector[nMissing] xProbs;
@@ -195,22 +195,20 @@ transformed parameters{
 }
 model{
   vector[k] betaFull[n];
-/*  row_vector[k-1] xCor[n];
-#  for(i in 1:n)
-#    xCor[i] <- x[i, 2:k] * 2 - 1; // Put it on a scale of [-1,1] instead of [0,1], for better correlation
+  row_vector[k-1] xCor[n];
   for(i in 1:nMissing)
     xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
   for(i in 1:nZero)
-    xCor[zeroPosN[i], zeroPosK[i]-1] <- -3;#xZero[i];
+    xCor[zeroPosN[i], zeroPosK[i]-1] <- xZero[i];
   for(i in 1:nOne)
-    xCor[onePosN[i], onePosK[i]-1] <- 3;#xOne[i];
-*/
+    xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
+
   for(i in 1:n)
     betaFull[i] <- beta;
-  #L ~ lkj_corr_cholesky(LKJParam);
+  L ~ lkj_corr_cholesky(LKJParam);
   beta ~ normal(0, 3);
   sigma ~ cauchy(0,2.5);
- # xCor ~ multi_normal_cholesky(muZero, L);
-xProbsLogit ~ normal(0,1);
+  xCor ~ multi_normal_cholesky(muZero, L);
+#xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }
