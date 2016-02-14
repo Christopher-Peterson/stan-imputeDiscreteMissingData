@@ -186,7 +186,6 @@ parameters{
   real<lower=0> sigma;
 #  cholesky_factor_corr[k-1] L;
   row_vector[nMissing] xProbsLogit;
-#  vector[k-1] muZero;
 #  vector<upper=-2>[nZero] xZero;
 #  vector<lower=2>[nOne] xOne;
 }
@@ -195,8 +194,8 @@ transformed parameters{
   xProbs <- Phi_rvec(xProbsLogit);
 }
 model{
-  row_vector[k-1] xCor[n];
   vector[k] betaFull[n];
+/*  row_vector[k-1] xCor[n];
 #  for(i in 1:n)
 #    xCor[i] <- x[i, 2:k] * 2 - 1; // Put it on a scale of [-1,1] instead of [0,1], for better correlation
   for(i in 1:nMissing)
@@ -205,14 +204,13 @@ model{
     xCor[zeroPosN[i], zeroPosK[i]-1] <- -3;#xZero[i];
   for(i in 1:nOne)
     xCor[onePosN[i], onePosK[i]-1] <- 3;#xOne[i];
-
+*/
   for(i in 1:n)
     betaFull[i] <- beta;
   #L ~ lkj_corr_cholesky(LKJParam);
   beta ~ normal(0, 3);
   sigma ~ cauchy(0,2.5);
-  muZero ~ normal(0,1);
  # xCor ~ multi_normal_cholesky(muZero, L);
-xProbsLogit ~ normal(0,4);
+xProbsLogit ~ normal(0,1);
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }

@@ -2,7 +2,7 @@ library(shinystan)
 library(rstan)
 n = 500
 k = 3  # not including intercept
-nMissing = n * k * .05
+nMissing = n * k * .15
 set.seed(3)
 propCols = round(gtools::rdirichlet(1, rep(3,k)) *nMissing)
 missingPosN = unlist(lapply(1:k, function(i) sample.int(500, size = propCols[i])))
@@ -37,7 +37,7 @@ zeroPosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==0))))   # column 
 setwd( "/media/peterson/B965-8339/R/discreteMissingData")
 
 fit = stan("discreteMissingDataTest.stan", chains = 1, iter = 10)
-fit = stan(fit = fit, chains = 5, cores=5, iter = 1000, control=list(adapt_delta=.9999, max_treedepth = 15))
+fit = stan(fit = fit, chains = 3, cores=3, iter = 1500,warmup=1000, control=list(adapt_delta=.999999, max_treedepth = 15))
 launch_shinystan(fit)
 
 #fit2 = stan("discreteMissingDataTest.stan", chains = 1, iter = 10)
