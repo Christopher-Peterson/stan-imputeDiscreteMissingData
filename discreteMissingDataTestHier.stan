@@ -148,27 +148,32 @@ functions{
 data{
   int n;
   int<lower=2> k; // num Covariates, including intercept
+  int nClust; // Number of clusters/hierarchical groups
+  int clustID[n]; // cluster membership for each row;
   int nMissing;  // Total number of missing categorical covariates
   int nMissingRows; // Number of rows with at least one missing value
-//  matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
+  int nClustMissing; // Number of clusters with missing data;
+  int missingClustID[nMissing]; // which of the above clusters corresponds to which missing variable.  
+  /* The above will be tricky to implement, since the clusters w/ no missing data could throw off the indexing*/
+  matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
   vector[n] y;
   int<lower=1, upper=n> missingRows[nMissingRows]; // These should be sorted from lowest to highest
   int<lower=1, upper=k-1> missingPerRow[nMissingRows]; // Number of missing columns in the missing row with the same index
   int<lower=1, upper=n> missingPosN[nMissing]; // row position of missing variable; these should be sorted from lowest to highest.
   int<lower=2, upper=k> missingPosK[nMissing]; // column position of missing variable, corresponding to missingPosN
   int<lower=1, upper=n>  wholeRows[n - nMissingRows]; // Rows with no missing covariates; not sure if 0 is actually a valid number
- 
+  real LKJParam; 
+/* 
   int nZero;  // number of zero's
   int nOne;  // number of ones.
   int<lower=1, upper=n> onePosN[nOne]; // row position of missing variable; these should be sorted from lowest to highest.
   int<lower=1, upper=k> onePosK[nOne]; // column position of missing variable, corresponding to missingPosN
   int<lower=1, upper=n> zeroPosN[nZero]; // row position of missing variable; these should be sorted from lowest to highest.
   int<lower=1, upper=k> zeroPosK[nZero]; // column position of missing variable, corresponding to missingPosN
-
-#  real LKJParam; 
+*/
 }
 transformed data{
-  vector[k-1] muZero;
+/*  vector[k-1] muZero;
   matrix[n,k] x;
   for(i in 1:n)
     x[i,1]<- 1;
@@ -179,20 +184,25 @@ transformed data{
   for(i in 1:nMissing)
     x[missingPosN[i], missingPosK[i]] <- 100;
   
-  muZero <- rep_vector(0, k-1);
+  muZero <- rep_vector(0, k-1);*/
 }
 parameters{
-  vector[k] beta; // Assume no hierarchy
+  row_vector[k] betaHier; 
+  vector<lower=0>[k] betaHierSD; 
+  matrix[nClust,k] betaRaw;
   real<lower=0> sigma;
+  real<lower=0> xProbsSigma;
+  cholesky_factor_corr[nClust] L;
   row_vector[nMissing] xProbsLogit;
-/* // For correlated version
-  vector<upper=-2>[nZero] xZero;
-  vector<lower=2>[nOne] xOne;
-  cholesky_factor_corr[k-1] L;  */
+  row_vector[nClustMissing] xProbsLogitHier;
 }
 transformed parameters{
+  matrix[nClust,k] beta;
   row_vector[nMissing] xProbs;
-  xProbs <- Phi_rvec(xProbsLogit);
+  xProbs <- Phi_rvec(xProbsLogit*xProbsSigma + xProbsLogitHier[missingClustID]);
+  
+  beta <- rep_vector(1, nClust) * betaHier + diag_pre_multiply(betaHierSD, L) * betaRaw;
+  
 }
 model{
   vector[k] betaFull[n];
@@ -207,11 +217,15 @@ model{
   L ~ lkj_corr_cholesky(LKJParam);
   xCor ~ multi_normal_cholesky(muZero, L); 
 */
+ xProbsLogitHier ~ normal(0,1); // Use this for the non-correlated version.
  xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
-
+ xProbsSigma~ cauchy(0, 1);
+ betaHierSD ~ cauchy(0, 2);
+ to_vector(betaRaw) ~ normal(0,1);
+ betaHier ~ normal(0, 3);
+ L ~ lkj_corr_cholesky(LKJParam);
   for(i in 1:n)
-    betaFull[i] <- beta;
-  beta ~ normal(0, 3);
+    betaFull[i] <- beta[clustID[i]]';
   sigma ~ cauchy(0,2.5);
 
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
