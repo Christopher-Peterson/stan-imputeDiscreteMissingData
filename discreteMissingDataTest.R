@@ -1,3 +1,5 @@
+library(shinystan)
+library(rstan)
 n = 500
 k = 3  # not including intercept
 nMissing = n * k * .15
@@ -33,10 +35,10 @@ zeroPosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==0)))   # row position 
 zeroPosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==0))))   # column position of missing variable, corresponding to missingPosN
 
 
-fit = stan("~/Documents/Files/RProjects/discreteMissingDataTest.stan", chains = 1, iter = 10)
-fit = stan(fit = fit, chains = 2, iter = 100)
-
-
+fit = stan("discreteMissingDataTest.stan", chains = 1, iter = 10)
+fit = stan(fit = fit, chains = 5, cores=5, iter = 1000)
+launch_shinystan
+(fit)
 
 
 
