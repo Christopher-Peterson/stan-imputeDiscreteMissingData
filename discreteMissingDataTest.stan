@@ -8,6 +8,20 @@ functions{
       out <- out * 2;
     return out;
   }
+  // convert i into a binary bit-mask of d length; revTwos is the powers of 2 from 1 to d-1, in reverse order.
+  row_vector dmd_bit_mask(int i, int d, int[] revTwos){
+    row_vector[d] out;
+    int iReal;
+    int outStep;
+    iReal <- i;
+    for(j in 1:d){
+      outStep <- int_step(iReal-revTwos[j]);
+      iReal <- iReal - revTwos[j] * outStep;
+      out[j] <- outStep;
+    }
+    return out;
+  }
+
   // take a row with d missing data points and return a 
   // vector of all possible combinations of linear predictors
   vector dmd_etas(row_vector x, vector beta, int[] missingPos){
@@ -49,24 +63,21 @@ functions{
       outSize <- dmd_pow2(d);
     { row_vector[d] posState; //<lower=0, upper=1>
       row_vector[d] posSign; //  -1 if posState is 1, 1 if posState is 0; //<lower=0, upper=1>
-      row_vector[d] twos; //<lower=2, upper=outSize>
+      int twos[d]; //<lower=2, upper=outSize>
       row_vector[d] tmpP;
-      //Initialize
+      // Twos need to be in reverse order.
         for(i in 1:d)
-          twos[i] <- 2.0^i;
+          twos[i] <- dmd_pow2(d-i);
       // create each output
       for(i in 1:outSize) {
-        for(j in 1:d) // increment posState; this is conceptually similar to using bitwise operators for binary masking
-          posState[j] <- step(j/twos[j] == floor(j/twos[j]));
+        posState <- dmd_bit_mask(i, d, twos); 
         posSign <- -2*posState + 1;
-        tmpP <- posState + posSign .* p;
+        tmpP <- posState + posSign .* p;  // equivalent to p or 1-p's, combined.
         out[i] <- sum(log(tmpP));
       }
     }
     return out;
-}
-  
-  //returns normal_log for a single row with some missing data
+  }  //returns normal_log for a single row with some missing data
   real dmd_normal_single_log(real y, row_vector x, real sigma, vector beta, row_vector p,  int[] missingPos){
     int d;
     real out;
