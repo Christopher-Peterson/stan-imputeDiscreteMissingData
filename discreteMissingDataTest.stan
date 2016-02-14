@@ -184,7 +184,7 @@ transformed parameters{
 model{
   row_vector[k-1] xCor[n];
   vector[k] betaFull[n];
-#  for(i in 1:n)
+//  for(i in 1:n)
 #    xCor[i] <- x[i, 2:k] * 2 - 1; // Put it on a scale of [-1,1] instead of [0,1], for better correlation
   for(i in 1:nMissing)
     xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
