@@ -165,7 +165,7 @@ data{
   int<lower=1, upper=n> zeroPosN[nZero]; // row position of missing variable; these should be sorted from lowest to highest.
   int<lower=1, upper=k> zeroPosK[nZero]; // column position of missing variable, corresponding to missingPosN
 
-  real LKJParam; 
+#  real LKJParam; 
 }
 transformed data{
   vector[k-1] muZero;
@@ -184,10 +184,11 @@ transformed data{
 parameters{
   vector[k] beta; // Assume no hierarchy
   real<lower=0> sigma;
-  cholesky_factor_corr[k-1] L;
   row_vector[nMissing] xProbsLogit;
+/* // For correlated version
   vector<upper=-2>[nZero] xZero;
   vector<lower=2>[nOne] xOne;
+  cholesky_factor_corr[k-1] L;  */
 }
 transformed parameters{
   row_vector[nMissing] xProbs;
@@ -195,6 +196,7 @@ transformed parameters{
 }
 model{
   vector[k] betaFull[n];
+/* //Correlated version below
   row_vector[k-1] xCor[n];
   for(i in 1:nMissing)
     xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
@@ -202,13 +204,15 @@ model{
     xCor[zeroPosN[i], zeroPosK[i]-1] <- xZero[i];
   for(i in 1:nOne)
     xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
+  L ~ lkj_corr_cholesky(LKJParam);
+  xCor ~ multi_normal_cholesky(muZero, L); 
+*/
+ xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
 
   for(i in 1:n)
     betaFull[i] <- beta;
-  L ~ lkj_corr_cholesky(LKJParam);
   beta ~ normal(0, 3);
   sigma ~ cauchy(0,2.5);
-  xCor ~ multi_normal_cholesky(muZero, L);
-#xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
+
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }
