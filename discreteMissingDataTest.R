@@ -1,3 +1,5 @@
+library(shinystan)
+library(rstan)
 n = 500
 k = 3  # not including intercept
 nMissing = n * k * .15
@@ -32,15 +34,60 @@ onePosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==1))))    # column 
 zeroPosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==0)))   # row position of missing variable; these should be sorted from lowest to highest.
 zeroPosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==0))))   # column position of missing variable, corresponding to missingPosN
 
+setwd( "/media/peterson/B965-8339/R/discreteMissingData")
 
-fit = stan("~/Documents/Files/RProjects/discreteMissingDataTest.stan", chains = 1, iter = 10)
-fit = stan(fit = fit, chains = 2, iter = 100)
+fit = stan("discreteMissingDataTest.stan", chains = 1, iter = 10)
+fit = stan(fit = fit, chains = 3, cores=3, iter = 1500,warmup=1000, control=list(adapt_delta=.999999, max_treedepth = 15))
+launch_shinystan(fit)
+
+#fit2 = stan("discreteMissingDataTest.stan", chains = 1, iter = 10)
+#fit2 = stan(fit = fit2, chains = 5, cores=5, iter = 1000)
+#launch_shinystan(fit2)
+
+
+
+### Make a test here to evaluate dmd_probs
+if(FALSE) {
+testProbs = c(.1, .8, .3, .7)
+probCombs = function(probs){
+  qs = 1-probs
+  lp = log(probs)
+  lq = log(qs)
+  k = length(probs)
+  combinations= do.call(c, lapply(1:(k-1), function(j) combn(k, j, simplify = FALSE)))
+  c(sum(lq), sapply(1:length(combinations), function(i)
+      sum(c(lp[combinations[[i]]], lq[-combinations[[i]]]))), sum(lp))
+}
+
+
+compProbs = probCombs(testProbs)
+probs = testProbs
+k = length(testProbs)
+
+dmdpTest = stan("dmd_probs.stan", chains = 1, iter = 1, algorithm = "Fixed_param")
 
 
 
 
 
+bitMask = function(i, d, revTwos = 2^((d-1):0)){
+    iReal <- i;
+    out = numeric(d)
+#    browser()
+  for(j in 1:d){
+      outStep <- ((iReal-revTwos[j]) > 0)*1 ;
+      iReal <- iReal - revTwos[j] * outStep;
+      out[j] <- outStep;
+    }
+    out;
+  }
+
+bitMask(3,4)
+
+lapply(1:16, function(i) bitMask(i, 4))
 
 
 
 
+
+}
