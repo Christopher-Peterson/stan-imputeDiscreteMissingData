@@ -141,7 +141,7 @@ functions{
   row_vector Phi_rvec(row_vector x){
     row_vector[cols(x)] out;
     for(i in 1:cols(x))
-      out[i] <- Phi(x[i]);
+      out[i] <- Phi_approx(x[i]);
     return out;
   }
 }
@@ -154,8 +154,6 @@ data{
   int nMissingRows; // Number of rows with at least one missing value
   int nClustMissing; // Number of clusters with missing data;
   int missingClustID[nMissing]; // which of the above clusters corresponds to which missing variable.  
-  //int missingIDTranslate[nClust]; // this array is assigned to 0 for positions where nClust has no missing elements; it's value is the position of nClustMissing that corresponds to its position in nClust if that cluster does have missing elements.
-  /* The above will be tricky to implement, since the clusters w/ no missing data could throw off the indexing*/
   matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
   vector[n] y;
   int<lower=1, upper=n> missingRows[nMissingRows]; // These should be sorted from lowest to highest
@@ -164,38 +162,16 @@ data{
   int<lower=2, upper=k> missingPosK[nMissing]; // column position of missing variable, corresponding to missingPosN
   int<lower=1, upper=n>  wholeRows[n - nMissingRows]; // Rows with no missing covariates; not sure if 0 is actually a valid number
   real LKJParam; 
-/* 
-  int nZero;  // number of zero's
-  int nOne;  // number of ones.
-  int<lower=1, upper=n> onePosN[nOne]; // row position of missing variable; these should be sorted from lowest to highest.
-  int<lower=1, upper=k> onePosK[nOne]; // column position of missing variable, corresponding to missingPosN
-  int<lower=1, upper=n> zeroPosN[nZero]; // row position of missing variable; these should be sorted from lowest to highest.
-  int<lower=1, upper=k> zeroPosK[nZero]; // column position of missing variable, corresponding to missingPosN
-*/
-}
-transformed data{
-/*  vector[k-1] muZero;
-  matrix[n,k] x;
-  for(i in 1:n)
-    x[i,1]<- 1;
-  for(i in 1:nOne)
-    x[onePosN[i], onePosK[i]] <- 1;
-  for(i in 1:nZero)
-    x[zeroPosN[i], zeroPosK[i]] <- 0;
-  for(i in 1:nMissing)
-    x[missingPosN[i], missingPosK[i]] <- 100;
-  
-  muZero <- rep_vector(0, k-1);*/
 }
 parameters{
   row_vector[k] betaHier; 
   vector<lower=0>[k] betaHierSD; 
   matrix[k,nClust] betaRaw;
   real<lower=0> sigma;
-  real<lower=0> xProbsSigma;
   cholesky_factor_corr[k] L;
   row_vector[nMissing] xProbsLogit;
   row_vector[nClustMissing] xProbsLogitHier;
+  real<lower=0> xProbsSigma;
 }
 transformed parameters{
   matrix[nClust,k] beta;
@@ -218,16 +194,17 @@ model{
   L ~ lkj_corr_cholesky(LKJParam);
   xCor ~ multi_normal_cholesky(muZero, L); 
 */
- xProbsLogitHier ~ normal(0,1); // Use this for the non-correlated version.
- xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
- xProbsSigma~ cauchy(0, 1);
- betaHierSD ~ cauchy(0, 2);
- to_vector(betaRaw) ~ normal(0,1);
- betaHier ~ normal(0, 3);
- L ~ lkj_corr_cholesky(LKJParam);
+  betaHier ~ normal(0, 3);
+  betaHierSD ~ cauchy(0, 2);
+  to_vector(betaRaw) ~ normal(0,1);
+  sigma ~ cauchy(0,2.5);
+  L ~ lkj_corr_cholesky(LKJParam);
+  xProbsLogitHier ~ normal(0,1); // Use this for the non-correlated version.
+  xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
+  xProbsSigma~ cauchy(0, 1);
+
   for(i in 1:n)
     betaFull[i] <- beta[clustID[i]]';
-  sigma ~ cauchy(0,2.5);
 
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }
