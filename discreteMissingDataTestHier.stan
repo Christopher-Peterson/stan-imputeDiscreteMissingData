@@ -154,6 +154,7 @@ data{
   int nMissingRows; // Number of rows with at least one missing value
   int nClustMissing; // Number of clusters with missing data;
   int missingClustID[nMissing]; // which of the above clusters corresponds to which missing variable.  
+  //int missingIDTranslate[nClust]; // this array is assigned to 0 for positions where nClust has no missing elements; it's value is the position of nClustMissing that corresponds to its position in nClust if that cluster does have missing elements.
   /* The above will be tricky to implement, since the clusters w/ no missing data could throw off the indexing*/
   matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
   vector[n] y;
@@ -189,10 +190,10 @@ transformed data{
 parameters{
   row_vector[k] betaHier; 
   vector<lower=0>[k] betaHierSD; 
-  matrix[nClust,k] betaRaw;
+  matrix[k,nClust] betaRaw;
   real<lower=0> sigma;
   real<lower=0> xProbsSigma;
-  cholesky_factor_corr[nClust] L;
+  cholesky_factor_corr[k] L;
   row_vector[nMissing] xProbsLogit;
   row_vector[nClustMissing] xProbsLogitHier;
 }
@@ -201,7 +202,7 @@ transformed parameters{
   row_vector[nMissing] xProbs;
   xProbs <- Phi_rvec(xProbsLogit*xProbsSigma + xProbsLogitHier[missingClustID]);
   
-  beta <- rep_vector(1, nClust) * betaHier + diag_pre_multiply(betaHierSD, L) * betaRaw;
+  beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
   
 }
 model{

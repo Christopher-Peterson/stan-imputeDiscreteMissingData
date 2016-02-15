@@ -3,7 +3,7 @@
 
 library(shinystan)
 library(rstan)
-
+library(mvtnorm)
 rcor <- function(n, d, eta = 1, chol = FALSE, forceList=FALSE){
   k = choose(d,2)
   out = lapply(1:n, function(i) {
@@ -30,9 +30,13 @@ rcor <- function(n, d, eta = 1, chol = FALSE, forceList=FALSE){
 
 
 n = 500
+nClust = 5
+nPerClust = n/nClust
 k = 3  # not including intercept
 nMissing = n * k * .15
-set.seed(3)
+clustID = rep(1:nClust, each = nPerClust)
+
+set.seed(2)
 propCols = round(gtools::rdirichlet(1, rep(3,k)) *nMissing)
 missingPosN = unlist(lapply(1:k, function(i) sample.int(500, size = propCols[i])))
 nMissing <- length(missingPosN)
@@ -45,13 +49,53 @@ nMissingRows = length(missingRows)
 missingPerRow = as.vector(table(missingPosN))
 wholeRows = setdiff(1:n, missingRows)
 
-beta = c(3, 8, -4, -7)
+betaHier = c(3, 8, -4, -7)
+L = rcor(1,k+1, 3, chol=TRUE)
+betaSD = c(2, .3, 1, 1.8)
+Omega = tcrossprod(diag(betaSD) %*% t(L))
+beta = rmvnorm(nClust,betaHier, sigma=Omega)
 sigma = 1
-x = cbind(1, matrix(rbinom(n*k, 1, .5),n,k))
-y = rnorm(n, x %*% beta, sigma) 
+
+# Make x vary by level.
+# This will require x to be generated as a normal distribution then "stepped"
+baseXMeans = rnorm(k)
+clustXMeans = rmvnorm(nClust, baseXMeans)
+x = cbind(1, do.call(rbind, lapply(1:n, function(i) rnorm(k, clustXMeans[clustID[i],]))) > 0)
+y = sapply(1:n, function(i) rnorm(1, x[i,] %*% t(beta[clustID[i],]), sigma))
 k = k+1 # update to include intercept
 library(rstan)
 LKJParam = 2
+
+
+## Now, we'll need to calcuate the helper indices for x.  These are:
+##   nClustMissing, the Number of clusters with missing data, and 
+##   missingClustID[nMissing], a vector of  which of the above clusters
+##    corresponds to which data point.
+##    We might also want to cinsider a clusterTranslate[nClustMissing], which
+##    ties the index of the missing cluster to the base cluster index
+##    
+
+# Figure out how many clusters are missing
+whichClustMissing <- unique(clustID[missingRows])
+nClustMissing <- length(whichClustMissing)
+missingIDTranslate = rep(0, nClust); missingIDTranslate[whichClustMissing] <- 1:nClustMissing
+missingClustID <-   missingIDTranslate[clustID[missingPosN]] 
+
+setwd("/home/peterson/Documents/Files/R/discreteMissingData")
+fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
+fit = stan(fit = fit, chains = 5, cores=5, iter = 2000, control=list(adapt_delta=.999, max_treedepth = 18))
+
+
+
+
+
+
+
+
+
+
+
+
 
 xTmp = x
 for(i in 1:nMissing)
