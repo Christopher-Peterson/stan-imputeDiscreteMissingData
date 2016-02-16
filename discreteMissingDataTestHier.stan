@@ -154,14 +154,32 @@ data{
   int nMissingRows; // Number of rows with at least one missing value
   int nClustMissing; // Number of clusters with missing data;
   int missingClustID[nMissing]; // which of the above clusters corresponds to which missing variable.  
-  matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
+#  matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
   vector[n] y;
-  int<lower=1, upper=n> missingRows[nMissingRows]; // These should be sorted from lowest to highest
-  int<lower=1, upper=k-1> missingPerRow[nMissingRows]; // Number of missing columns in the missing row with the same index
-  int<lower=1, upper=n> missingPosN[nMissing]; // row position of missing variable; these should be sorted from lowest to highest.
-  int<lower=2, upper=k> missingPosK[nMissing]; // column position of missing variable, corresponding to missingPosN
-  int<lower=1, upper=n>  wholeRows[n - nMissingRows]; // Rows with no missing covariates; not sure if 0 is actually a valid number
+  int missingRows[nMissingRows]; // These should be sorted from lowest to highest
+  int missingPerRow[nMissingRows]; // Num missing columns in the missing row with the same index
+  int missingPosN[nMissing]; // row poition. of missing variable, sorted from lowest to highest.
+  int missingPosK[nMissing]; // column position of missing variable, corresponding to missingPosN
+  int<lower=1, upper=n>  wholeRows[n - nMissingRows]; // Rows w/ no missing covariates
   real LKJParam; 
+  
+  int nZero;  // number of zero's
+  int nOne;  // number of ones.
+  int onePosN[nOne]; // row position of missing variable, sorted from lowest to highest.
+  int onePosK[nOne]; // column position of missing variable, corresponding to missingPosN
+  int zeroPosN[nZero]; // row position of missing variable, sorted from lowest to highest.
+  int zeroPosK[nZero]; // column position of missing variable, corresponding to missingPosN
+}
+transformed data{
+  matrix[n,k] x;
+  for(i in 1:n)
+    x[i,1]<- 1;
+  for(i in 1:nOne)
+    x[onePosN[i], onePosK[i]] <- 1;
+  for(i in 1:nZero)
+    x[zeroPosN[i], zeroPosK[i]] <- 0;
+  for(i in 1:nMissing)
+    x[missingPosN[i], missingPosK[i]] <- 100;
 }
 parameters{
   row_vector[k] betaHier; 
@@ -170,37 +188,51 @@ parameters{
   real<lower=0> sigma;
   cholesky_factor_corr[k] L;
   row_vector[nMissing] xProbsLogit;
-  row_vector[nClustMissing] xProbsLogitHier;
-  real<lower=0> xProbsSigma;
+  matrix[nClust, k-1] xProbsHier;
+  vector<lower=0>[k-1]  xProbsSigma;
+  // For correlated version
+  vector<upper=0>[nZero] xZero;
+  vector<lower=0>[nOne] xOne;
+  cholesky_factor_corr[k-1] xL; 
 }
+
+/*# But seriously, how am I going to fix this fucking thing? 
+ *# Clearly, we need some sort of site-level hyperparameter regulating the probability of things bing as they are
+ *# Use bernoulli_logit?
+ *# Or should we just go straight back to the old latent variable approach? Let's try that first.
+ *# 
+ *# 
+*/# 
 transformed parameters{
   matrix[nClust,k] beta;
   row_vector[nMissing] xProbs;
-  xProbs <- Phi_rvec(xProbsLogit*xProbsSigma + xProbsLogitHier[missingClustID]);
-  
+  xProbs <- Phi_rvec(xProbsLogit);
   beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
   
 }
 model{
   vector[k] betaFull[n];
-/* //Correlated version below
+ //Correlated version below
   row_vector[k-1] xCor[n];
+  row_vector[k-1] xMu[n];
   for(i in 1:nMissing)
     xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
   for(i in 1:nZero)
     xCor[zeroPosN[i], zeroPosK[i]-1] <- xZero[i];
   for(i in 1:nOne)
     xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
-  L ~ lkj_corr_cholesky(LKJParam);
-  xCor ~ multi_normal_cholesky(muZero, L); 
-*/
+  xL ~ lkj_corr_cholesky(LKJParam);
+  for(i in 1:n)
+    xMu[i] <- xProbsHier[clustID[i]];
+  xCor ~ multi_normal_cholesky(xMu, diag_pre_multiply(xProbsSigma,xL)); 
+
   betaHier ~ normal(0, 3);
   betaHierSD ~ cauchy(0, 2);
   to_vector(betaRaw) ~ normal(0,1);
   sigma ~ cauchy(0,2.5);
   L ~ lkj_corr_cholesky(LKJParam);
-  xProbsLogitHier ~ normal(0,1); // Use this for the non-correlated version.
-  xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
+  to_vector(xProbsHier) ~ normal(0,1); // Use this for the non-correlated version.
+  #xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
   xProbsSigma~ cauchy(0, 1);
 
   for(i in 1:n)

@@ -81,9 +81,23 @@ nClustMissing <- length(whichClustMissing)
 missingIDTranslate = rep(0, nClust); missingIDTranslate[whichClustMissing] <- 1:nClustMissing
 missingClustID <-   missingIDTranslate[clustID[missingPosN]] 
 
-setwd("/home/peterson/Documents/Files/R/discreteMissingData")
+xTmp = x
+for(i in 1:nMissing)
+  xTmp[missingPosN[i],missingPosK[i]]<- 100000
+nZero = sum(xTmp==0);  # number of zeros
+nOne = sum(xTmp[,-1]==1);  # number of ones.
+onePosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==1)))   # row position of missing variable; these should be sorted from lowest to highest.
+onePosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==1))))    # column position of missing variable, corresponding to missingPosN
+zeroPosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==0)))   # row position of missing variable; these should be sorted from lowest to highest.
+zeroPosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==0))))   # column position of missing variable, corresponding to missingPosN
+rm(xTmp)
+
+
+
+
+#setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
-fit = stan(fit = fit, chains = 5, cores=5, iter = 2000, control=list(adapt_delta=.999, max_treedepth = 18))
+fit = stan(fit = fit, chains = 5, cores=5, iter = 1000, control=list(adapt_delta=.9, max_treedepth = 13))
 
 
 
