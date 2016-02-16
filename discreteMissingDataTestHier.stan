@@ -144,6 +144,12 @@ functions{
       out[i] <- Phi_approx(x[i]);
     return out;
   }
+  row_vector inv_logit_rvec(row_vector x){
+    row_vector[cols(x)] out;
+    for(i in 1:cols(x))
+      out[i] <- inv_logit(x[i]);
+    return out;
+  }
 }
 data{
   int n;
@@ -191,12 +197,12 @@ parameters{
   matrix[nClust, k-1] xProbsHier;
   vector<lower=0>[k-1]  xProbsSigma;
   // For correlated version
-  vector<upper=0>[nZero] xZero;
-  vector<lower=0>[nOne] xOne;
-  cholesky_factor_corr[k-1] xL; 
+#  vector<upper=0>[nZero] xZero;
+#  vector<lower=0>[nOne] xOne;
+#  cholesky_factor_corr[k-1] xL; 
 }
 
-/*# But seriously, how am I going to fix this fucking thing? 
+/*# But seriously, how am I going to fix this thing? 
  *# Clearly, we need some sort of site-level hyperparameter regulating the probability of things bing as they are
  *# Use bernoulli_logit?
  *# Or should we just go straight back to the old latent variable approach? Let's try that first.
@@ -206,37 +212,45 @@ parameters{
 transformed parameters{
   matrix[nClust,k] beta;
   row_vector[nMissing] xProbs;
-  xProbs <- Phi_rvec(xProbsLogit);
+  { row_vector[nMissing] missingMu;
+    row_vector[nMissing] missingSigma;
+    for(i in 1:nMissing){
+      missingMu[i] <- xProbsHier[clustID[missingPosN[i]], missingPosK[i]-1];
+      missingSigma[i] <- xProbsSigma[missingPosK[i]-1];
+    }
+    xProbs <- inv_logit_rvec(xProbsLogit .* missingSigma + missingMu);
+  }
   beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
-  
 }
 model{
   vector[k] betaFull[n];
- //Correlated version below
+/* //Correlated version below
   row_vector[k-1] xCor[n];
   row_vector[k-1] xMu[n];
   for(i in 1:nMissing)
-    xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
+    xCor[missingPosN[i], missingPosK[i]-1] <- #xProbsLogit[i];
   for(i in 1:nZero)
-    xCor[zeroPosN[i], zeroPosK[i]-1] <- xZero[i];
+    xCor[zeroPosN[i], zeroPosK[i]-1] <- 0;# xZero[i];
   for(i in 1:nOne)
-    xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
-  xL ~ lkj_corr_cholesky(LKJParam);
-  for(i in 1:n)
-    xMu[i] <- xProbsHier[clustID[i]];
-  xCor ~ multi_normal_cholesky(xMu, diag_pre_multiply(xProbsSigma,xL)); 
-
+    xCor[onePosN[i], onePosK[i]-1] <- 1;#xOne[i];
+*/    
+  vector[nZero] zeroMu;
+  vector[nOne] oneMu;
+  for(i in 1:nZero)
+    zeroMu[i] <- xProbsHier[clustID[zeroPosN[i]], zeroPosK[i]-1];
+  for(i in 1:nOne)
+    oneMu[i] <- xProbsHier[clustID[onePosN[i]], onePosK[i]-1];
+  0 ~ bernoulli_logit(zeroMu);
+  1 ~ bernoulli_logit(oneMu);
+  xProbsLogit ~ normal(0,1);
   betaHier ~ normal(0, 3);
   betaHierSD ~ cauchy(0, 2);
   to_vector(betaRaw) ~ normal(0,1);
   sigma ~ cauchy(0,2.5);
   L ~ lkj_corr_cholesky(LKJParam);
   to_vector(xProbsHier) ~ normal(0,1); // Use this for the non-correlated version.
-  #xProbsLogit ~ normal(0,1); // Use this for the non-correlated version.
   xProbsSigma~ cauchy(0, 1);
-
   for(i in 1:n)
     betaFull[i] <- beta[clustID[i]]';
-
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }
