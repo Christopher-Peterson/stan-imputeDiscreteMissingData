@@ -29,16 +29,16 @@ rcor <- function(n, d, eta = 1, chol = FALSE, forceList=FALSE){
 }   # random correlation; eta is LKJ parameter
 
 
-n = 500
-nClust = 5
+n = 1500
+nClust = 3
 nPerClust = n/nClust
 k = 3  # not including intercept
-nMissing = n * k * .15
+nMissing = n * k * .01
 clustID = rep(1:nClust, each = nPerClust)
 
 set.seed(2)
 propCols = round(gtools::rdirichlet(1, rep(3,k)) *nMissing)
-missingPosN = unlist(lapply(1:k, function(i) sample.int(500, size = propCols[i])))
+missingPosN = unlist(lapply(1:k, function(i) sample.int(n, size = propCols[i])))
 nMissing <- length(missingPosN)
 orderN = order(missingPosN)
 missingPosN = sort(missingPosN)
@@ -97,8 +97,8 @@ rm(xTmp)
 
 #setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
-fit = stan(fit = fit, chains = 5, cores=5, iter = 1000, control=list(adapt_delta=.9, max_treedepth = 13))
-
+fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 800, control=list(adapt_delta=.9, max_treedepth = 13))
+print(fit,"beta")
 
 
 
