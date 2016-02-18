@@ -197,9 +197,9 @@ parameters{
   matrix[nClust, k-1] xProbsHier;
   vector<lower=0>[k-1]  xProbsSigma;
   // For correlated version
-#  vector<upper=0>[nZero] xZero;
-#  vector<lower=0>[nOne] xOne;
-#  cholesky_factor_corr[k-1] xL; 
+  vector<upper=0>[nZero] xZero;
+  vector<lower=0>[nOne] xOne;
+  cholesky_factor_corr[k-1] xL; 
 }
 
 /*# But seriously, how am I going to fix this thing? 
@@ -212,37 +212,24 @@ parameters{
 transformed parameters{
   matrix[nClust,k] beta;
   row_vector[nMissing] xProbs;
-  { row_vector[nMissing] missingMu;
-    row_vector[nMissing] missingSigma;
-    for(i in 1:nMissing){
-      missingMu[i] <- xProbsHier[clustID[missingPosN[i]], missingPosK[i]-1];
-      missingSigma[i] <- xProbsSigma[missingPosK[i]-1];
-    }
-    xProbs <- inv_logit_rvec(xProbsLogit .* missingSigma + missingMu);
-  }
+  xProbs <- Phi_rvec(xProbsLogit);
   beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
 }
 model{
   vector[k] betaFull[n];
-/* //Correlated version below
   row_vector[k-1] xCor[n];
   row_vector[k-1] xMu[n];
   for(i in 1:nMissing)
-    xCor[missingPosN[i], missingPosK[i]-1] <- #xProbsLogit[i];
+    xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
   for(i in 1:nZero)
-    xCor[zeroPosN[i], zeroPosK[i]-1] <- 0;# xZero[i];
+    xCor[zeroPosN[i], zeroPosK[i]-1] <- xZero[i];
   for(i in 1:nOne)
-    xCor[onePosN[i], onePosK[i]-1] <- 1;#xOne[i];
-*/    
-  vector[nZero] zeroMu;
-  vector[nOne] oneMu;
-  for(i in 1:nZero)
-    zeroMu[i] <- xProbsHier[clustID[zeroPosN[i]], zeroPosK[i]-1];
-  for(i in 1:nOne)
-    oneMu[i] <- xProbsHier[clustID[onePosN[i]], onePosK[i]-1];
-  0 ~ bernoulli_logit(zeroMu);
-  1 ~ bernoulli_logit(oneMu);
-  xProbsLogit ~ normal(0,1);
+    xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
+  xL ~ lkj_corr_cholesky(LKJParam);
+  for(i in 1:n)
+    xMu[i] <- xProbsHier[clustID[i]];
+  xCor ~ multi_normal_cholesky(xMu, diag_pre_multiply(xProbsSigma,xL)); 
+
   betaHier ~ normal(0, 3);
   betaHierSD ~ cauchy(0, 2);
   to_vector(betaRaw) ~ normal(0,1);
