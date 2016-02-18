@@ -33,22 +33,28 @@ n = 1500
 nClust = 3
 nPerClust = n/nClust
 k = 3  # not including intercept
-nMissing = n * k * .01
+nMissing = n * k * 0
 clustID = rep(1:nClust, each = nPerClust)
 
 set.seed(2)
-propCols = round(gtools::rdirichlet(1, rep(3,k)) *nMissing)
-missingPosN = unlist(lapply(1:k, function(i) sample.int(n, size = propCols[i])))
-nMissing <- length(missingPosN)
-orderN = order(missingPosN)
-missingPosN = sort(missingPosN)
-missingPosK = rep(1:k, times = propCols)+1
-missingPosK = missingPosK[orderN]
-missingRows = unique(missingPosN)
-nMissingRows = length(missingRows)
-missingPerRow = as.vector(table(missingPosN))
-wholeRows = setdiff(1:n, missingRows)
-
+if(nMissing>0){
+  propCols = round(gtools::rdirichlet(1, rep(3,k)) *nMissing)
+  missingPosN = unlist(lapply(1:k, function(i) sample.int(n, size = propCols[i])))
+  nMissing <- length(missingPosN)
+  orderN = order(missingPosN)
+  missingPosN = sort(missingPosN)
+  missingPosK = rep(1:k, times = propCols)+1
+  missingPosK = missingPosK[orderN]
+  missingRows = unique(missingPosN)
+  nMissingRows = length(missingRows)
+  missingPerRow = as.vector(table(missingPosN))
+  wholeRows = setdiff(1:n, missingRows)
+  whichClustMissing <- unique(clustID[missingRows])
+  nClustMissing <- length(whichClustMissing)
+  missingIDTranslate = rep(0, nClust); missingIDTranslate[whichClustMissing] <- 1:nClustMissing
+  missingClustID <-   missingIDTranslate[clustID[missingPosN]] 
+}
+set.seed(3)
 betaHier = c(3, 8, -4, -7)
 L = rcor(1,k+1, 3, chol=TRUE)
 betaSD = c(2, .3, 1, 1.8)
@@ -63,26 +69,11 @@ clustXMeans = rmvnorm(nClust, baseXMeans)
 x = cbind(1, do.call(rbind, lapply(1:n, function(i) rnorm(k, clustXMeans[clustID[i],]))) > 0)
 y = sapply(1:n, function(i) rnorm(1, x[i,] %*% t(beta[clustID[i],]), sigma))
 k = k+1 # update to include intercept
-library(rstan)
 LKJParam = 2
 
 
-## Now, we'll need to calcuate the helper indices for x.  These are:
-##   nClustMissing, the Number of clusters with missing data, and 
-##   missingClustID[nMissing], a vector of  which of the above clusters
-##    corresponds to which data point.
-##    We might also want to cinsider a clusterTranslate[nClustMissing], which
-##    ties the index of the missing cluster to the base cluster index
-##    
-
-# Figure out how many clusters are missing
-whichClustMissing <- unique(clustID[missingRows])
-nClustMissing <- length(whichClustMissing)
-missingIDTranslate = rep(0, nClust); missingIDTranslate[whichClustMissing] <- 1:nClustMissing
-missingClustID <-   missingIDTranslate[clustID[missingPosN]] 
-
 xTmp = x
-for(i in 1:nMissing)
+if(nMissing > 0) for(i in 1:nMissing)
   xTmp[missingPosN[i],missingPosK[i]]<- 100000
 nZero = sum(xTmp==0);  # number of zeros
 nOne = sum(xTmp[,-1]==1);  # number of ones.
@@ -94,6 +85,8 @@ rm(xTmp)
 
 
 
+fit = stan("hierNoMissingTest.stan", chains = 1, iter = 10)
+fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 800, control=list(adapt_delta=.9, max_treedepth = 13))
 
 #setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
