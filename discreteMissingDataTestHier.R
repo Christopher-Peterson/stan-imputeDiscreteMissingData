@@ -90,7 +90,7 @@ if(nMissing == 0) {
 }
 setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
-fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 1000, control=list(adapt_delta=.9, max_treedepth = 13))
+fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 1400, control=list(adapt_delta=.999, max_treedepth = 13))
 print(fit,"beta")
 
 

@@ -178,6 +178,8 @@ data{
 }
 transformed data{
   matrix[n,k] x;
+  row_vector[nClust] clustOnes;
+  clustOnes <- rep_row_vector(1, nClust);
   for(i in 1:n)
     x[i,1]<- 1;
   for(i in 1:nOne)
@@ -188,7 +190,7 @@ transformed data{
     x[missingPosN[i], missingPosK[i]] <- 100;
 }
 parameters{
-  row_vector[k] betaHier; 
+  vector[k] betaHier; 
   vector<lower=0>[k] betaHierSD; 
   matrix[k,nClust] betaRaw;
   real<lower=0> sigma;
@@ -201,19 +203,11 @@ parameters{
   vector<lower=0>[nOne] xOne;
   cholesky_factor_corr[k-1] xL; 
 }
-
-/*# But seriously, how am I going to fix this thing? 
- *# Clearly, we need some sort of site-level hyperparameter regulating the probability of things bing as they are
- *# Use bernoulli_logit?
- *# Or should we just go straight back to the old latent variable approach? Let's try that first.
- *# 
- *# 
-*/# 
 transformed parameters{
-  matrix[nClust,k] beta;
+  matrix[k, nClust] beta;
   row_vector[nMissing] xProbs;
   xProbs <- Phi_rvec(xProbsLogit);
-  beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
+  beta <-  betaHier * clustOnes + diag_pre_multiply(betaHierSD, L) * betaRaw;
 }
 model{
   vector[k] betaFull[n];
@@ -238,6 +232,6 @@ model{
   to_vector(xProbsHier) ~ normal(0,1); // Use this for the non-correlated version.
   xProbsSigma~ cauchy(0, 1);
   for(i in 1:n)
-    betaFull[i] <- beta[clustID[i]]';
+    betaFull[i] <- col(beta,clustID[i]);
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
 }
