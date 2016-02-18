@@ -196,12 +196,16 @@ parameters{
   real<lower=0> sigma;
   cholesky_factor_corr[k] L;
   row_vector[nMissing] xProbsLogit;
+ /*
   matrix[nClust, k-1] xProbsHier;
+  row_vector[k-1] xProbsHierPrior;
+
   vector<lower=0>[k-1]  xProbsSigma;
   // For correlated version
   vector<upper=0>[nZero] xZero;
   vector<lower=0>[nOne] xOne;
   cholesky_factor_corr[k-1] xL; 
+  */
 }
 transformed parameters{
   matrix[k, nClust] beta;
@@ -211,7 +215,7 @@ transformed parameters{
 }
 model{
   vector[k] betaFull[n];
-  row_vector[k-1] xCor[n];
+/*  row_vector[k-1] xCor[n];
   row_vector[k-1] xMu[n];
   for(i in 1:nMissing)
     xCor[missingPosN[i], missingPosK[i]-1] <- xProbsLogit[i];
@@ -221,16 +225,18 @@ model{
     xCor[onePosN[i], onePosK[i]-1] <- xOne[i];
   xL ~ lkj_corr_cholesky(LKJParam);
   for(i in 1:n)
-    xMu[i] <- xProbsHier[clustID[i]];
+    xMu[i] <- xProbsHier[clustID[i]] + xProbsHierPrior;
   xCor ~ multi_normal_cholesky(xMu, diag_pre_multiply(xProbsSigma,xL)); 
-
+  to_vector(xProbsHier) ~ normal(0,1); // Use this for the non-correlated version.
+  xProbsSigma~ cauchy(0, 1);
+  xProbsHierPrior ~ normal(0,1);
+*/
+  xProbsLogit ~ normal(0,1);
   betaHier ~ normal(0, 3);
   betaHierSD ~ cauchy(0, 2);
   to_vector(betaRaw) ~ normal(0,1);
   sigma ~ cauchy(0,2.5);
   L ~ lkj_corr_cholesky(LKJParam);
-  to_vector(xProbsHier) ~ normal(0,1); // Use this for the non-correlated version.
-  xProbsSigma~ cauchy(0, 1);
   for(i in 1:n)
     betaFull[i] <- col(beta,clustID[i]);
   y ~ dmd_normal(x, rep_vector(sigma,n), betaFull, xProbs, missingRows, missingPerRow, wholeRows, missingPosK);
