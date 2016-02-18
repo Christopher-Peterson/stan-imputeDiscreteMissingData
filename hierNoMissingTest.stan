@@ -159,14 +159,14 @@ data{
   matrix[n, k] x; // column 1 should be all 1's.; this is dropped for the fully latent variable version
   vector[n] y;
   real LKJParam; 
-  
+  /*
   int nZero;  // number of zero's
   int nOne;  // number of ones.
   int onePosN[nOne]; // row position of missing variable, sorted from lowest to highest.
   int onePosK[nOne]; // column position of missing variable, corresponding to missingPosN
   int zeroPosN[nZero]; // row position of missing variable, sorted from lowest to highest.
   int zeroPosK[nZero]; // column position of missing variable, corresponding to missingPosN
-}
+*/}
 /*transformed data{
   matrix[n,k] x;
   for(i in 1:n)
@@ -186,7 +186,8 @@ parameters{
 
 transformed parameters{
   matrix[nClust,k] beta;
-  beta <- rep_vector(1, nClust) * betaHier + (diag_pre_multiply(betaHierSD, L) * betaRaw)';
+  beta <- rep_vector(1, nClust) * betaHier + 
+  (diag_pre_multiply(betaHierSD, L) * betaRaw)';
 }
 model{
   vector[n] eta;
@@ -196,6 +197,6 @@ model{
   sigma ~ cauchy(0,2.5);
   L ~ lkj_corr_cholesky(LKJParam);
   for(i in 1:n)
-    eta[i] <- x[i] * beta[clustID[i]]';
+    eta[i] <- dot_product(x[i], beta[clustID[i]]);
   y ~ normal(eta, sigma);
 }
