@@ -29,11 +29,11 @@ rcor <- function(n, d, eta = 1, chol = FALSE, forceList=FALSE){
 }   # random correlation; eta is LKJ parameter
 
 
-n = 1500
+n = 300
 nClust = 3
 nPerClust = n/nClust
 k = 3  # not including intercept
-nMissing = n * k * 0
+nMissing = n * k * 0.15
 clustID = rep(1:nClust, each = nPerClust)
 
 set.seed(2)
@@ -67,14 +67,15 @@ sigma = 1
 baseXMeans = rnorm(k)
 clustXMeans = rmvnorm(nClust, baseXMeans)
 x = cbind(1, do.call(rbind, lapply(1:n, function(i) rnorm(k, clustXMeans[clustID[i],]))) > 0)
-y = sapply(1:n, function(i) rnorm(1, x[i,] %*% t(beta[clustID[i],]), sigma))
+y = sapply(1:n, function(i) rnorm(1, x[i,] %*% beta[clustID[i],], sigma))
 k = k+1 # update to include intercept
 LKJParam = 2
 
 
 xTmp = x
-if(nMissing > 0) for(i in 1:nMissing)
+if(nMissing > 0){ for(i in 1:nMissing)
   xTmp[missingPosN[i],missingPosK[i]]<- 100000
+<<<<<<< HEAD
 nZero = sum(xTmp==0);  # number of zeros
 nOne = sum(xTmp[,-1]==1);  # number of ones.
 onePosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==1)))   # row position of missing variable; these should be sorted from lowest to highest.
@@ -87,19 +88,36 @@ rm(xTmp)
 
 fit = stan("hierNoMissingTest.stan", chains = 1, iter = 10)
 fit = stan(fit = fit,seed=2, chains = 2, iter = 500, control=list(adapt_delta=.9, max_treedepth = 13))
+=======
+  nZero = sum(xTmp==0);  # number of zeros
+  nOne = sum(xTmp[,-1]==1);  # number of ones.
+  onePosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==1)))   # row position of missing variable; these should be sorted from lowest to highest.
+  onePosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==1))))    # column position of missing variable, corresponding to missingPosN
+  zeroPosN = unlist(lapply(2:k, function(i) which(xTmp[,i]==0)))   # row position of missing variable; these should be sorted from lowest to highest.
+  zeroPosK = unlist(lapply(2:k, function(i) rep(i, sum(xTmp[,i]==0))))   # column position of missing variable, corresponding to missingPosN
+  rm(xTmp)
+}
+>>>>>>> 45c4b9ba31969c86fa0abe63607d973f84aaf45c
 
-#setwd("/home/peterson/Documents/Files/R/discreteMissingData")
+if(nMissing == 0) {
+  fit = stan("hierNoMissingTest.stan", chains = 1, iter = 10)
+  fit = stan(fit = fit,seed=2, chains = 4, cores=4, iter = 100, control=list(adapt_delta=.9, max_treedepth = 13))
+}
+setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
-fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 800, control=list(adapt_delta=.9, max_treedepth = 13))
+fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 1000, control=list(adapt_delta=.9, max_treedepth = 13))
 print(fit,"beta")
 
 
 
 
-
-
-
-
+tmpY = y[clustID==1]
+tmpx1 = x[clustID==1,2]
+tmpx2 = x[clustID==1,3]
+tmpx3 = x[clustID==1,4]
+lm(tmpY~tmpx1+tmpx2+tmpx3)
+x11()
+boxplot(tmpY, tmpx1)
 
 
 
