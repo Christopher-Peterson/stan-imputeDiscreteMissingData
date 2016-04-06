@@ -86,7 +86,7 @@ rm(xTmp)
 
 
 fit = stan("hierNoMissingTest.stan", chains = 1, iter = 10)
-fit = stan(fit = fit,seed=2, chains = 5, cores=5, iter = 800, control=list(adapt_delta=.9, max_treedepth = 13))
+fit = stan(fit = fit,seed=2, chains = 2, iter = 500, control=list(adapt_delta=.9, max_treedepth = 13))
 
 #setwd("/home/peterson/Documents/Files/R/discreteMissingData")
 fit = stan("discreteMissingDataTestHier.stan", chains = 1, iter = 10)
